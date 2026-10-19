@@ -1,0 +1,707 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DUO — Plataforma Cooperativa</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: #101923;
+    color: white;
+    font-family: Arial, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.game-container {
+    width: min(100%, 1000px);
+    background: #1b2a3b;
+    border: 1px solid #40566c;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 15px 50px #0006;
+}
+
+header {
+    padding: 18px 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.logo {
+    font-size: 26px;
+    font-weight: 900;
+    letter-spacing: 3px;
+}
+
+.logo span {
+    color: #55e6a5;
+}
+
+#level-name {
+    color: #bdcddd;
+    font-size: 13px;
+}
+
+.canvas-wrap {
+    width: 100%;
+    background: #172333;
+}
+
+canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 3 / 2;
+    outline: none;
+}
+
+.status {
+    padding: 12px 18px;
+    background: #25374b;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 13px;
+}
+
+#lever-status {
+    color: #ff929e;
+    font-weight: bold;
+}
+
+.controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 16px;
+}
+
+.player-info {
+    padding: 14px;
+    background: #172333;
+    border: 1px solid #40566c;
+    border-radius: 9px;
+    line-height: 1.8;
+    font-size: 13px;
+}
+
+.player-info strong {
+    display: block;
+    font-size: 15px;
+    margin-bottom: 5px;
+}
+
+.blue { color: #53b7ff; }
+.orange { color: #ffbd59; }
+
+.buttons {
+    display: flex;
+    gap: 8px;
+    padding: 0 16px 16px;
+}
+
+button {
+    border: 0;
+    border-radius: 7px;
+    padding: 12px 16px;
+    cursor: pointer;
+    font-weight: bold;
+    background: #344c63;
+    color: white;
+    transition: background .15s, transform .15s;
+}
+
+button:hover {
+    background: #496783;
+}
+
+button:active {
+    transform: scale(.97);
+}
+
+#next-btn {
+    background: #247a5a;
+    flex: 1;
+}
+
+#next-btn:hover {
+    background: #309c73;
+}
+
+footer {
+    padding: 0 16px 16px;
+    color: #a8bacb;
+    font-size: 12px;
+    text-align: center;
+}
+
+@media (max-width: 550px) {
+    body { padding: 5px; }
+    .controls { grid-template-columns: 1fr; }
+    header { padding: 13px; }
+    .logo { font-size: 22px; }
+    .buttons { flex-wrap: wrap; }
+}
+</style>
+</head>
+
+<body>
+<div class="game-container">
+
+    <header>
+        <div class="logo">D<span>U</span>O</div>
+        <div id="level-name">FASE 1/3</div>
+    </header>
+
+    <div class="canvas-wrap">
+        <canvas id="game" width="900" height="600"
+                tabindex="0" aria-label="Jogo DUO"></canvas>
+    </div>
+
+    <div class="status">
+        <span id="goal">Ative a alavanca e os dois cheguem à saída.</span>
+        <span id="lever-status">● ALAVANCA DESATIVADA</span>
+    </div>
+
+    <div class="controls">
+        <div class="player-info">
+            <strong class="blue">■ JOGADOR 1</strong>
+            A — mover para a esquerda<br>
+            D — mover para a direita<br>
+            W — pular
+        </div>
+
+        <div class="player-info">
+            <strong class="orange">■ JOGADOR 2</strong>
+            ← — mover para a esquerda<br>
+            → — mover para a direita<br>
+            ↑ — pular
+        </div>
+    </div>
+
+    <div class="buttons">
+        <button id="restart-btn">↻ Reiniciar fase (R)</button>
+        <button id="next-btn">Próxima fase (ESPAÇO)</button>
+    </div>
+
+    <footer>
+        E: ativar a alavanca · Os dois jogadores precisam cooperar!
+    </footer>
+</div>
+
+<script>
+"use strict";
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const W = 900;
+const H = 600;
+const GRAVITY = 0.65;
+const SPEED = 4.2;
+const JUMP = -12.5;
+const PW = 28;
+const PH = 38;
+
+const LEVELS = [
+    {
+        name: "A ponte precisa de dois",
+        goal: "Ative a alavanca com E e os dois cheguem à saída.",
+        platforms: [
+            [0,550,900,50],
+            [70,450,170,18],
+            [300,380,130,18],
+            [530,450,120,18],
+            [735,370,110,18]
+        ],
+        lever: [350,345,28,35],
+        door: [700,470,35,80],
+        exit: [820,500,45,50]
+    },
+    {
+        name: "Um segura, o outro passa",
+        goal: "Cooperem para subir, ativem a alavanca e cheguem à saída.",
+        platforms: [
+            [0,550,900,50],
+            [55,455,125,18],
+            [235,390,120,18],
+            [425,330,120,18],
+            [610,390,115,18],
+            [760,455,100,18]
+        ],
+        lever: [465,295,28,35],
+        door: [720,470,35,80],
+        exit: [820,500,45,50]
+    },
+    {
+        name: "A saída dupla",
+        goal: "Ativem a alavanca e cheguem juntos à saída.",
+        platforms: [
+            [0,550,900,50],
+            [100,460,120,18],
+            [280,400,120,18],
+            [470,460,120,18],
+            [650,400,120,18]
+        ],
+        lever: [310,365,28,35],
+        door: [720,470,35,80],
+        exit: [820,500,45,50]
+    }
+];
+
+const stars = [
+    [60,70],[180,120],[280,55],[440,95],
+    [580,60],[760,125],[840,70],[670,210],[120,235]
+];
+
+let levelIndex = 0;
+let level;
+let p1;
+let p2;
+let switchOn = false;
+let won = false;
+let message = "";
+let keys = new Set();
+
+function makePlayer(x, y, color, name, left, right, jump) {
+    return {
+        x, y,
+        vx: 0,
+        vy: 0,
+        color,
+        name,
+        left,
+        right,
+        jump,
+        onGround: false,
+        jumpHeld: false,
+        alive: true
+    };
+}
+
+function rect(p) {
+    return [p.x, p.y, PW, PH];
+}
+
+function overlap(a, b) {
+    return (
+        a[0] < b[0] + b[2] &&
+        a[0] + a[2] > b[0] &&
+        a[1] < b[1] + b[3] &&
+        a[1] + a[3] > b[1]
+    );
+}
+
+function nearLever(p) {
+    const [x, y, w, h] = level.lever;
+    const margin = 35;
+
+    return overlap(rect(p), [
+        x - margin,
+        y - margin,
+        w + margin * 2,
+        h + margin * 2
+    ]);
+}
+
+function resetLevel() {
+    level = LEVELS[levelIndex];
+
+    p1 = makePlayer(
+        45, 500, "#53b7ff",
+        "JOGADOR 1", "a", "d", "w"
+    );
+
+    p2 = makePlayer(
+        95, 500, "#ffbd59",
+        "JOGADOR 2", "arrowleft", "arrowright", "arrowup"
+    );
+
+    switchOn = false;
+    won = false;
+    message = "";
+    keys.clear();
+
+    updateStatus();
+    canvas.focus();
+}
+
+function nextLevel() {
+    if (!won) return;
+
+    levelIndex = (levelIndex + 1) % LEVELS.length;
+    resetLevel();
+}
+
+function keyDown(event) {
+    const key = event.key.toLowerCase();
+
+    if ([
+        "arrowleft", "arrowright", "arrowup",
+        "arrowdown", " ", "w", "a", "d", "e", "r"
+    ].includes(key)) {
+        event.preventDefault();
+    }
+
+    // Uma ação por pressionamento, mesmo com a tecla segurada.
+    if (keys.has(key)) return;
+    keys.add(key);
+
+    if (key === "r") {
+        resetLevel();
+        return;
+    }
+
+    if (key === " " && won) {
+        nextLevel();
+        return;
+    }
+
+    if (key === "e" && !switchOn && !won) {
+        if (
+            (p1.alive && nearLever(p1)) ||
+            (p2.alive && nearLever(p2))
+        ) {
+            switchOn = true;
+            message = "A alavanca foi ativada! A porta está aberta.";
+            updateStatus();
+        }
+    }
+}
+
+function keyUp(event) {
+    keys.delete(event.key.toLowerCase());
+}
+
+window.addEventListener("keydown", keyDown);
+window.addEventListener("keyup", keyUp);
+window.addEventListener("blur", () => keys.clear());
+
+document.getElementById("restart-btn").addEventListener("click", resetLevel);
+document.getElementById("next-btn").addEventListener("click", () => {
+    if (won) nextLevel();
+    else if (levelIndex === LEVELS.length - 1) {
+        message = "Conclua a fase antes de avançar.";
+    } else {
+        message = "Conclua a fase antes de avançar.";
+    }
+});
+
+function movePlayer(p) {
+    if (!p.alive || won) return;
+
+    p.vx = 0;
+
+    if (keys.has(p.left)) p.vx -= SPEED;
+    if (keys.has(p.right)) p.vx += SPEED;
+
+    // Pulo somente quando o jogador está apoiado.
+    if (keys.has(p.jump)) {
+        if (p.onGround && !p.jumpHeld) {
+            p.vy = JUMP;
+            p.onGround = false;
+        }
+        p.jumpHeld = true;
+    } else {
+        p.jumpHeld = false;
+    }
+
+    // Movimento horizontal e colisão com a porta.
+    const oldX = p.x;
+    p.x += p.vx;
+    p.x = Math.max(0, Math.min(W - PW, p.x));
+
+    if (!switchOn && overlap(rect(p), level.door)) {
+        if (p.vx > 0) {
+            p.x = level.door[0] - PW;
+        } else if (p.vx < 0) {
+            p.x = level.door[0] + level.door[2];
+        } else {
+            p.x = oldX;
+        }
+    }
+
+    // Gravidade e colisões verticais.
+    const oldY = p.y;
+    const oldBottom = oldY + PH;
+
+    p.vy += GRAVITY;
+    p.y += p.vy;
+    p.onGround = false;
+
+    for (const [x, y, width] of level.platforms) {
+        const horizontalOverlap =
+            p.x + PW > x && p.x < x + width;
+
+        const crossedPlatform =
+            oldBottom <= y && p.y + PH >= y;
+
+        if (
+            p.vy >= 0 &&
+            horizontalOverlap &&
+            crossedPlatform
+        ) {
+            p.y = y - PH;
+            p.vy = 0;
+            p.onGround = true;
+        }
+    }
+
+    if (p.y > H + 80) {
+        p.alive = false;
+        message = p.name + " caiu! Pressione R para reiniciar.";
+    }
+}
+
+function updateGame() {
+    if (won) return;
+
+    if (!p1.alive || !p2.alive) return;
+
+    movePlayer(p1);
+    movePlayer(p2);
+
+    if (
+        switchOn &&
+        overlap(rect(p1), level.exit) &&
+        overlap(rect(p2), level.exit)
+    ) {
+        won = true;
+        message = "FASE CONCLUÍDA! Os dois conseguiram juntos.";
+    }
+
+    if (!p1.alive || !p2.alive) {
+        message = "Um parceiro caiu! Pressione R para tentar novamente.";
+    }
+
+    updateStatus();
+}
+
+function updateStatus() {
+    document.getElementById("level-name").textContent =
+        `FASE ${levelIndex + 1}/${LEVELS.length} — ${level.name}`;
+
+    document.getElementById("goal").textContent =
+        won ? "Fase concluída! Excelente cooperação." : level.goal;
+
+    const status = document.getElementById("lever-status");
+    status.textContent = switchOn
+        ? "● ALAVANCA ATIVADA"
+        : "● ALAVANCA DESATIVADA";
+
+    status.style.color = switchOn ? "#55e6a5" : "#ff929e";
+}
+
+function drawPlayer(p) {
+    if (!p.alive) return;
+
+    const x = p.x;
+    const y = p.y;
+
+    ctx.fillStyle = p.color;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 2;
+
+    ctx.fillRect(x, y, PW, PH);
+    ctx.strokeRect(x, y, PW, PH);
+
+    ctx.fillStyle = "#172333";
+    ctx.beginPath();
+    ctx.arc(x + 8, y + 10, 2, 0, Math.PI * 2);
+    ctx.arc(x + 20, y + 10, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = p.color;
+    ctx.font = "bold 11px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(p.name, x + PW / 2, y - 10);
+}
+
+function draw() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = "#172333";
+    ctx.fillRect(0, 0, W, H);
+
+    // Fundo estrelado.
+    ctx.fillStyle = "#71859c";
+    for (const [x, y] of stars) {
+        ctx.fillRect(x, y, 3, 3);
+    }
+
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 19px Arial";
+    ctx.fillText(
+        `DUO | FASE ${levelIndex + 1}/${LEVELS.length}: ${level.name}`,
+        18, 28
+    );
+
+    ctx.fillStyle = "#c9d8e8";
+    ctx.font = "12px Arial";
+    ctx.fillText(level.goal, 18, 52);
+
+    // Plataformas.
+    for (const [x, y, w, h] of level.platforms) {
+        ctx.fillStyle = "#50677c";
+        ctx.fillRect(x, y, w, h);
+
+        ctx.strokeStyle = "#8ca7be";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, w, h);
+
+        ctx.fillStyle = "#8ca7be";
+        ctx.fillRect(x, y, w, 4);
+    }
+
+    // Alavanca.
+    const [sx, sy, sw, sh] = level.lever;
+
+    ctx.fillStyle = switchOn ? "#55e6a5" : "#d65b6b";
+    ctx.fillRect(sx, sy, sw, sh);
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(sx, sy, sw, sh);
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 10px Arial";
+    ctx.fillText("ALAVANCA", sx + sw / 2, sy - 10);
+
+    if (!switchOn) {
+        ctx.fillStyle = "#ffe08a";
+        ctx.font = "bold 13px Arial";
+        ctx.fillText("E", sx + sw / 2, sy + sh + 15);
+    }
+
+    // Porta bloqueada ou aberta.
+    const [dx, dy, dw, dh] = level.door;
+
+    if (!switchOn) {
+        ctx.fillStyle = "#b44859";
+        ctx.fillRect(dx, dy, dw, dh);
+
+        ctx.strokeStyle = "#ffb3bd";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(dx, dy, dw, dh);
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 24px Arial";
+        ctx.fillText("X", dx + dw / 2, dy + dh / 2 + 8);
+    } else {
+        ctx.strokeStyle = "#55e6a5";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 4]);
+        ctx.strokeRect(dx, dy, dw, dh);
+        ctx.setLineDash([]);
+    }
+
+    // Saída.
+    const [ex, ey, ew, eh] = level.exit;
+
+    ctx.fillStyle = "#4d3e86";
+    ctx.fillRect(ex, ey, ew, eh);
+    ctx.strokeStyle = "#bba8ff";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(ex, ey, ew, eh);
+
+    ctx.save();
+    ctx.translate(ex + ew / 2, ey + eh / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 10px Arial";
+    ctx.fillText("SAÍDA", 0, 4);
+    ctx.restore();
+
+    drawPlayer(p1);
+    drawPlayer(p2);
+
+    // Estado da alavanca.
+    ctx.textAlign = "right";
+    ctx.fillStyle = switchOn ? "#55e6a5" : "#ff929e";
+    ctx.font = "bold 12px Arial";
+    ctx.fillText(
+        switchOn ? "ALAVANCA: ATIVADA" : "ALAVANCA: DESATIVADA",
+        W - 15, 27
+    );
+
+    // Aviso de proximidade.
+    if (
+        !switchOn && !won &&
+        ((p1.alive && nearLever(p1)) ||
+         (p2.alive && nearLever(p2)))
+    ) {
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#ffe08a";
+        ctx.font = "bold 15px Arial";
+        ctx.fillText("PRESSIONE E PARA ATIVAR A ALAVANCA", W / 2, 100);
+    }
+
+    // Mensagem de vitória ou derrota.
+    if (message) {
+        ctx.fillStyle = "#101923";
+        ctx.fillRect(110, 230, 680, 125);
+
+        ctx.strokeStyle = "#dce9f6";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(110, 230, 680, 125);
+
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 17px Arial";
+
+        const words = message.split(" ");
+        let line = "";
+        let lines = [];
+        for (const word of words) {
+            const test = line ? line + " " + word : word;
+            if (ctx.measureText(test).width > 620) {
+                lines.push(line);
+                line = word;
+            } else {
+                line = test;
+            }
+        }
+        if (line) lines.push(line);
+
+        const startY = 275 - ((lines.length - 1) * 10);
+        lines.forEach((text, i) => {
+            ctx.fillText(text, W / 2, startY + i * 23);
+        });
+
+        ctx.fillStyle = "#ffe08a";
+        ctx.font = "bold 13px Arial";
+        ctx.fillText(
+            won
+                ? "Pressione ESPAÇO para a próxima fase"
+                : "Pressione R para reiniciar a fase",
+            W / 2, 330
+        );
+    }
+}
+
+function loop() {
+    updateGame();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+resetLevel();
+loop();
+</script>
+</body>
+</html>
